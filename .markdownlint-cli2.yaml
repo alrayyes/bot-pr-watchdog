@@ -5,7 +5,9 @@ config:
 ignores:
   - node_modules
   - .claude/**
-  # OpenSpec's own change-artifact templates (proposal/design/tasks/specs)
-  # dictate their own shape (## as the first heading, long single-paragraph
-  # bullets) - not prose this repo's house style governs.
+  # OpenSpec's own templates (proposal/design/tasks/specs) dictate their
+  # own shape (## as the first heading, long single-paragraph bullets) -
+  # not prose this repo's house style governs. Archived main specs under
+  # openspec/specs/ carry the same shape once synced from a change.
   - openspec/changes/**
+  - openspec/specs/**
