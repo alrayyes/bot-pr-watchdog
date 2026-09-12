@@ -117,7 +117,9 @@ JSON
 
   run "$WATCHDOG_SCRIPT"
   [ "$status" -eq 0 ]
-  ! grep -q "issue create" "$GH_LOG"
+
+  run grep -q "issue create" "$GH_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "closes a tracking issue whose PR has since merged" {
@@ -150,7 +152,24 @@ JSON
 
   run "$WATCHDOG_SCRIPT"
   [ "$status" -eq 0 ]
-  ! grep -q "issue create" "$GH_LOG"
+
+  run grep -q "issue create" "$GH_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "leaves a tracking issue open when its PR can't be fetched" {
+  cat >"$GH_ISSUE_LIST_JSON" <<'JSON'
+[{"number":13,"body":"https://github.com/alrayyes/foo/pull/5 has a failing check."}]
+JSON
+  # No pr_view_fixture set up for alrayyes/foo#5, so the stub's "gh pr view"
+  # fails exactly like a transient API error would.
+
+  run "$WATCHDOG_SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"::warning::could not check https://github.com/alrayyes/foo/pull/5, leaving issue #13 open"* ]]
+
+  run grep -q "issue close" "$GH_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "ignores a non-bot, non-release-please PR even if it's failing" {
@@ -161,5 +180,8 @@ JSON
 
   run "$WATCHDOG_SCRIPT"
   [ "$status" -eq 0 ]
-  ! grep -q "issue create" "$GH_LOG"
+
+  run grep -q "issue create" "$GH_LOG"
+  [ "$status" -ne 0 ]
 }
+
