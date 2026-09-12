@@ -31,13 +31,25 @@ pr_is_open_and_failing() {
 
 open_tracking_issue() {
   local pr_url="$1" pr_title="$2"
-  gh issue create --repo "$WATCHDOG_REPO" \
-    --assignee "$WATCHDOG_ASSIGNEE" \
+  local issue_url issue_number
+  issue_url="$(gh issue create --repo "$WATCHDOG_REPO" \
     --title "CI failing: $pr_title" \
     --body "$pr_url has a failing check.
 
 Opened automatically by the watchdog. This issue closes on its own once the
-PR merges, closes, or its checks go green."
+PR merges, closes, or its checks go green.")"
+  issue_number="${issue_url##*/}"
+
+  # Not `gh issue create --assignee`/`gh issue edit --add-assignee`: both go
+  # through a GraphQL mutation (replaceActorsForAssignable /
+  # addAssigneesToAssignable) that a fine-grained PAT can't use - confirmed
+  # live: "GraphQL: Resource not accessible by personal access token
+  # (replaceActorsForAssignable)". The plain REST assignees endpoint is a
+  # different code path and isn't affected the same way.
+  if ! gh api -X POST "repos/$WATCHDOG_REPO/issues/$issue_number/assignees" \
+    -f "assignees[]=$WATCHDOG_ASSIGNEE" >/dev/null; then
+    echo "::warning::could not assign issue #$issue_number to $WATCHDOG_ASSIGNEE"
+  fi
 }
 
 close_tracking_issue() {
