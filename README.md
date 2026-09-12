@@ -64,7 +64,7 @@ this repo's own use:
 
 ## Reducing bot-PR noise further
 
-This repo only covers the *failure* half of bot-PR noise — it says nothing
+This repo only covers the _failure_ half of bot-PR noise — it says nothing
 about the routine emails GitHub and Codecov send for every bot PR whether
 it's failing or not. Two settings close the rest of that gap, each on the
 repos that need it, not here:
