@@ -1,0 +1,25 @@
+name: Watchdog
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# No cancel-in-progress: this queues a run behind one still in flight
+# rather than racing two pollers against the same tracking issues.
+concurrency:
+  group: watchdog
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Poll for failing bot PRs
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: ./scripts/watchdog.sh

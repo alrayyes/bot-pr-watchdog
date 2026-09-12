@@ -1,0 +1,11 @@
+config:
+  extends: "markdownlint/style/prettier"
+  line-length: { line_length: 100 }
+
+ignores:
+  - node_modules
+  - .claude/**
+  # OpenSpec's own change-artifact templates (proposal/design/tasks/specs)
+  # dictate their own shape (## as the first heading, long single-paragraph
+  # bullets) - not prose this repo's house style governs.
+  - openspec/changes/**

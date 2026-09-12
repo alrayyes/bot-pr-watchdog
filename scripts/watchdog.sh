@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Polls github.com/alrayyes for open, failing Dependabot/release-please PRs
+# and reflects them as tracking issues (open/close) in this repo.
+set -euo pipefail
+
+: "${WATCHDOG_OWNER:=alrayyes}"
+: "${WATCHDOG_REPO:=alrayyes/bot-pr-watchdog}"
+: "${WATCHDOG_ASSIGNEE:=alrayyes}"
+
+release_please_title_re='^chore(\(main\))?: release'
+
+is_bot_pr() {
+  local login="$1" title="$2"
+  [[ "$login" == "dependabot[bot]" ]] && return 0
+  [[ "$title" =~ $release_please_title_re ]] && return 0
+  return 1
+}
+
+# Fetches the PR's own live state directly (never from search-index or
+# cached data) - see design.md for why gh search prs's --checks flag isn't
+# trusted here.
+pr_is_open_and_failing() {
+  local pr_url="$1"
+  local repo number rollup
+  repo="$(sed -E 's#https://github.com/([^/]+/[^/]+)/pull/[0-9]+#\1#' <<<"$pr_url")"
+  number="$(sed -E 's#.*/pull/([0-9]+)#\1#' <<<"$pr_url")"
+  rollup="$(gh pr view "$number" --repo "$repo" --json statusCheckRollup,state 2>/dev/null)" || return 1
+  [[ "$(jq -r '.state' <<<"$rollup")" == "OPEN" ]] || return 1
+  jq -e '[.statusCheckRollup[]? | select(.conclusion == "FAILURE")] | length > 0' <<<"$rollup" >/dev/null
+}
+
+open_tracking_issue() {
+  local pr_url="$1" pr_title="$2"
+  gh issue create --repo "$WATCHDOG_REPO" \
+    --assignee "$WATCHDOG_ASSIGNEE" \
+    --title "CI failing: $pr_title" \
+    --body "$pr_url has a failing check.
+
+Opened automatically by the watchdog. This issue closes on its own once the
+PR merges, closes, or its checks go green."
+}
+
+close_tracking_issue() {
+  local issue_number="$1" reason="$2"
+  gh issue close "$issue_number" --repo "$WATCHDOG_REPO" \
+    --comment "Closing automatically: $reason."
+}
+
+# Extracts the one github.com PR URL a tracking issue's body links to.
+tracked_pr_url() {
+  grep -oE 'https://github\.com/[^/[:space:]]+/[^/[:space:]]+/pull/[0-9]+' <<<"$1" | head -1
+}
+
+main() {
+  local candidates open_issues
+
+  candidates="$(gh search prs --owner "$WATCHDOG_OWNER" --state open --archived=false \
+    --json url,title,repository,author --limit 200)"
+
+  while IFS=$'\t' read -r url title login; do
+    [[ -z "$url" ]] && continue
+    is_bot_pr "$login" "$title" || continue
+    pr_is_open_and_failing "$url" || continue
+
+    open_issues="$(gh issue list --repo "$WATCHDOG_REPO" --state open --json number,body)"
+    if [[ -z "$(jq -r --arg url "$url" '[.[] | select(.body | contains($url))][0].number // empty' <<<"$open_issues")" ]]; then
+      echo "opening tracking issue for $url"
+      open_tracking_issue "$url" "$title"
+    fi
+  done < <(jq -r '.[] | [.url, .title, .author.login] | @tsv' <<<"$candidates")
+
+  open_issues="$(gh issue list --repo "$WATCHDOG_REPO" --state open --json number,body)"
+  while IFS=$'\t' read -r issue_number issue_body; do
+    [[ -z "$issue_number" ]] && continue
+    local pr_url
+    pr_url="$(tracked_pr_url "$issue_body")"
+    [[ -z "$pr_url" ]] && continue
+    if ! pr_is_open_and_failing "$pr_url"; then
+      echo "closing tracking issue #$issue_number ($pr_url resolved)"
+      close_tracking_issue "$issue_number" "$pr_url is no longer open and failing"
+    fi
+  done < <(jq -r '.[] | [(.number|tostring), (.body | gsub("\n"; " "))] | @tsv' <<<"$open_issues")
+}
+
+main "$@"
