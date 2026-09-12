@@ -17,6 +17,8 @@ setup() {
   echo '[]' >"$GH_SEARCH_PRS_JSON"
   echo '[]' >"$GH_ISSUE_LIST_JSON"
 
+  export GH_API_EXIT_CODE=0
+
   cat >"$STUB_DIR/gh" <<'STUB'
 #!/usr/bin/env bash
 echo "$*" >>"$GH_LOG"
@@ -40,10 +42,13 @@ case "$1 $2" in
     cat "$GH_ISSUE_LIST_JSON"
     ;;
   "issue create")
-    exit 0
+    echo "https://github.com/alrayyes/bot-pr-watchdog/issues/1"
     ;;
   "issue close")
     exit 0
+    ;;
+  "api -X")
+    exit "$GH_API_EXIT_CODE"
     ;;
   *)
     exit 1
@@ -72,6 +77,20 @@ JSON
   grep -q "issue create" "$GH_LOG"
   grep -q "CI failing: fix(deps): bump x from 1 to 2" "$GH_LOG"
   grep -q "https://github.com/alrayyes/foo/pull/5" "$GH_LOG"
+  grep -q "api -X POST repos/alrayyes/bot-pr-watchdog/issues/1/assignees -f assignees\[\]=alrayyes" "$GH_LOG"
+}
+
+@test "still opens the issue, with a warning, when the assignee call fails" {
+  export GH_API_EXIT_CODE=1
+  cat >"$GH_SEARCH_PRS_JSON" <<'JSON'
+[{"url":"https://github.com/alrayyes/foo/pull/5","title":"fix(deps): bump x","repository":{"nameWithOwner":"alrayyes/foo"},"author":{"login":"dependabot[bot]"}}]
+JSON
+  pr_view_fixture "alrayyes/foo" 5 OPEN FAILURE
+
+  run "$WATCHDOG_SCRIPT"
+  [ "$status" -eq 0 ]
+  grep -q "issue create" "$GH_LOG"
+  [[ "$output" == *"::warning::could not assign issue #1 to alrayyes"* ]]
 }
 
 @test "opens a tracking issue for a failing release-please PR by title alone" {
