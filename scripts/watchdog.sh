@@ -46,6 +46,7 @@ open_tracking_issue() {
   local issue_url issue_number
   issue_url="$(gh_repo issue create --repo "$WATCHDOG_REPO" \
     --title "CI failing: $pr_title" \
+    --label bug \
     --body "$pr_url has a failing check.
 
 Opened automatically by the watchdog. This issue closes on its own once the
