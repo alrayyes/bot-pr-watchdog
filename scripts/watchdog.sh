@@ -31,12 +31,19 @@ is_bot_pr() {
 # Fetches the PR's own live state directly (never from search-index or
 # cached data) - see design.md for why gh search prs's --checks flag isn't
 # trusted here.
+#
+# Exit codes are distinct on purpose: 0 = open and failing, 1 = confirmed
+# no longer open-and-failing, 2 = couldn't determine (gh pr view itself
+# failed). A caller that closes a tracking issue on "anything but 0" would
+# treat a transient API error the same as a resolved PR and close an issue
+# for something that might still be failing - see the reconciliation loop
+# in main, which treats 2 as "leave it open, try again next run."
 pr_is_open_and_failing() {
   local pr_url="$1"
   local repo number rollup
   repo="$(sed -E 's#https://github.com/([^/]+/[^/]+)/pull/[0-9]+#\1#' <<<"$pr_url")"
   number="$(sed -E 's#.*/pull/([0-9]+)#\1#' <<<"$pr_url")"
-  rollup="$(gh pr view "$number" --repo "$repo" --json statusCheckRollup,state 2>/dev/null)" || return 1
+  rollup="$(gh pr view "$number" --repo "$repo" --json statusCheckRollup,state 2>/dev/null)" || return 2
   [[ "$(jq -r '.state' <<<"$rollup")" == "OPEN" ]] || return 1
   jq -e '[.statusCheckRollup[]? | select(.conclusion == "FAILURE")] | length > 0' <<<"$rollup" >/dev/null
 }
@@ -91,10 +98,14 @@ main() {
   open_issues="$(gh_repo issue list --repo "$WATCHDOG_REPO" --state open --json number,body)"
   while IFS=$'\t' read -r issue_number issue_body; do
     [[ -z "$issue_number" ]] && continue
-    local pr_url
+    local pr_url status
     pr_url="$(tracked_pr_url "$issue_body")"
     [[ -z "$pr_url" ]] && continue
-    if ! pr_is_open_and_failing "$pr_url"; then
+
+    pr_is_open_and_failing "$pr_url" && status=0 || status=$?
+    if [[ "$status" -eq 2 ]]; then
+      echo "::warning::could not check $pr_url, leaving issue #$issue_number open"
+    elif [[ "$status" -ne 0 ]]; then
       echo "closing tracking issue #$issue_number ($pr_url resolved)"
       close_tracking_issue "$issue_number" "$pr_url is no longer open and failing"
     fi
