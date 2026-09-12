@@ -18,7 +18,13 @@ pre-commit:
 
     - name: markdownlint
       glob: "*.md"
-      run: bunx markdownlint-cli2 {staged_files}
+      run: bunx markdownlint-cli2 --fix {staged_files}
+      stage_fixed: true
+
+    - name: sort-package-json
+      glob: "package.json"
+      run: bunx sort-package-json {staged_files}
+      stage_fixed: true
 
 commit-msg:
   jobs:
@@ -43,3 +49,9 @@ pre-push:
 
     - name: markdownlint
       run: bun run lint:md
+
+    - name: sort-package-json
+      run: bunx sort-package-json --check
+
+    - name: bun audit
+      run: bun audit
