@@ -62,6 +62,24 @@ this repo's own use:
 - `GH_REPO_TOKEN` (falls back to `GH_TOKEN`) — write access to this repo's
   issues (`GITHUB_TOKEN` in the workflow)
 
+## Reducing bot-PR noise further
+
+This repo only covers the _failure_ half of bot-PR noise — it says nothing
+about the routine emails GitHub and Codecov send for every bot PR whether
+it's failing or not. Two settings close the rest of that gap, each on the
+repos that need it, not here:
+
+- **GitHub's per-repo Custom Watch**: on each repo, Watch → Custom → check
+  Issues, uncheck Pull requests. This repo's own tracking-issue assignment
+  still reaches you (assignment always notifies, regardless of Watch
+  settings) — it's the "Dependabot opened a PR" email for every bump,
+  passing or not, that this turns off.
+- **Codecov's `comment: false`**: `codecov.yml`, alongside the
+  `coverage.status` off-switches — see
+  `skills/repo-creation/`'s Codecov section in the dotfiles CLAUDE.md. Stops
+  the redundant per-PR coverage comment; the badge and report are
+  unaffected.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

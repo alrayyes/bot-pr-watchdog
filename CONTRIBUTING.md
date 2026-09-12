@@ -35,6 +35,8 @@ actionlint
 bats tests/*.bats
 bun run format:check   # prettier --check on *.md/*.yml/*.yaml
 bun run lint:md        # markdownlint-cli2
+bunx sort-package-json --check
+bun audit
 ```
 
 Everything above also runs in CI (`.github/workflows/ci.yml`); `lefthook`
