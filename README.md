@@ -24,9 +24,12 @@ goes green), its tracking issue closes on its own.
   [`actionlint`](https://github.com/rhysd/actionlint), and
   [bats-core](https://bats-core.readthedocs.io/) 1.10.0+ (not your OS
   package — see `CONTRIBUTING.md`).
-- A `RELEASE_TOKEN` repo secret: a classic PAT with account-wide "all
+- A `RELEASE_TOKEN` repo secret: a fine-grained PAT with account-wide "all
   repositories" access, so the workflow can see PRs across every repo
-  `alrayyes` owns, not just this one.
+  `alrayyes` owns, not just this one. It's used only for that read —
+  assigning issues in this repo goes through the workflow's own
+  `GITHUB_TOKEN` instead, since `RELEASE_TOKEN` can't assign issues at all
+  (confirmed live: a flat 403, GraphQL and REST alike).
 
 ## Usage
 
@@ -38,22 +41,26 @@ gh workflow run watchdog.yml --repo alrayyes/bot-pr-watchdog
 ```
 
 To run the underlying script locally (needs `gh` authenticated as an
-account that can see the PRs you want to poll):
+account that can see the PRs you want to poll, and again as something with
+write access to this repo's issues — the same account for both is fine):
 
 ```sh
-GH_TOKEN=<a token with the same account-wide access> ./scripts/watchdog.sh
+GH_TOKEN=<account-wide read access> GH_REPO_TOKEN=<write access to this repo> ./scripts/watchdog.sh
 ```
 
 ## Configuration
 
-`scripts/watchdog.sh` reads three environment variables, all defaulted for
+`scripts/watchdog.sh` reads these environment variables, all defaulted for
 this repo's own use:
 
-| Variable            | Default                    | Meaning                                   |
-| ------------------- | -------------------------- | ----------------------------------------- |
-| `WATCHDOG_OWNER`    | `alrayyes`                 | account to poll for open PRs              |
-| `WATCHDOG_REPO`     | `alrayyes/bot-pr-watchdog` | repo tracking issues are opened/closed in |
-| `WATCHDOG_ASSIGNEE` | `alrayyes`                 | who a new tracking issue is assigned to   |
+- `WATCHDOG_OWNER` (default `alrayyes`) — account to poll for open PRs
+- `WATCHDOG_REPO` (default `alrayyes/bot-pr-watchdog`) — repo tracking
+  issues are opened/closed in
+- `WATCHDOG_ASSIGNEE` (default `alrayyes`) — who a new tracking issue is
+  assigned to
+- `GH_TOKEN` — account-wide read (`RELEASE_TOKEN` in the workflow)
+- `GH_REPO_TOKEN` (falls back to `GH_TOKEN`) — write access to this repo's
+  issues (`GITHUB_TOKEN` in the workflow)
 
 ## Contributing
 
