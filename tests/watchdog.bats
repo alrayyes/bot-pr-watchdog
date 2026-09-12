@@ -77,6 +77,7 @@ JSON
   grep -q "issue create" "$GH_LOG"
   grep -q "CI failing: fix(deps): bump x from 1 to 2" "$GH_LOG"
   grep -q "https://github.com/alrayyes/foo/pull/5" "$GH_LOG"
+  grep -q -- "--label bug" "$GH_LOG"
   grep -q "api -X POST repos/alrayyes/bot-pr-watchdog/issues/1/assignees -f assignees\[\]=alrayyes" "$GH_LOG"
 }
 
