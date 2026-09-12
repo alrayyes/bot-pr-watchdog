@@ -6,6 +6,18 @@ set -euo pipefail
 : "${WATCHDOG_OWNER:=alrayyes}"
 : "${WATCHDOG_REPO:=alrayyes/bot-pr-watchdog}"
 : "${WATCHDOG_ASSIGNEE:=alrayyes}"
+# Issue writes on this repo use GH_REPO_TOKEN (the workflow's own
+# first-party GITHUB_TOKEN), not the ambient GH_TOKEN (RELEASE_TOKEN, needed
+# for reading PRs account-wide) - RELEASE_TOKEN, a fine-grained PAT, gets a
+# flat 403 "Resource not accessible by personal access token" assigning
+# issues, confirmed live via both the GraphQL and REST paths. GITHUB_TOKEN
+# hits neither restriction for issues in its own repo. Falls back to
+# GH_TOKEN so a local/dev run with only one token still works.
+: "${GH_REPO_TOKEN:=${GH_TOKEN:-}}"
+
+gh_repo() {
+  GH_TOKEN="$GH_REPO_TOKEN" gh "$@"
+}
 
 release_please_title_re='^chore(\(main\))?: release'
 
@@ -32,7 +44,7 @@ pr_is_open_and_failing() {
 open_tracking_issue() {
   local pr_url="$1" pr_title="$2"
   local issue_url issue_number
-  issue_url="$(gh issue create --repo "$WATCHDOG_REPO" \
+  issue_url="$(gh_repo issue create --repo "$WATCHDOG_REPO" \
     --title "CI failing: $pr_title" \
     --body "$pr_url has a failing check.
 
@@ -40,13 +52,7 @@ Opened automatically by the watchdog. This issue closes on its own once the
 PR merges, closes, or its checks go green.")"
   issue_number="${issue_url##*/}"
 
-  # Not `gh issue create --assignee`/`gh issue edit --add-assignee`: both go
-  # through a GraphQL mutation (replaceActorsForAssignable /
-  # addAssigneesToAssignable) that a fine-grained PAT can't use - confirmed
-  # live: "GraphQL: Resource not accessible by personal access token
-  # (replaceActorsForAssignable)". The plain REST assignees endpoint is a
-  # different code path and isn't affected the same way.
-  if ! gh api -X POST "repos/$WATCHDOG_REPO/issues/$issue_number/assignees" \
+  if ! gh_repo api -X POST "repos/$WATCHDOG_REPO/issues/$issue_number/assignees" \
     -f "assignees[]=$WATCHDOG_ASSIGNEE" >/dev/null; then
     echo "::warning::could not assign issue #$issue_number to $WATCHDOG_ASSIGNEE"
   fi
@@ -54,7 +60,7 @@ PR merges, closes, or its checks go green.")"
 
 close_tracking_issue() {
   local issue_number="$1" reason="$2"
-  gh issue close "$issue_number" --repo "$WATCHDOG_REPO" \
+  gh_repo issue close "$issue_number" --repo "$WATCHDOG_REPO" \
     --comment "Closing automatically: $reason."
 }
 
@@ -74,14 +80,14 @@ main() {
     is_bot_pr "$login" "$title" || continue
     pr_is_open_and_failing "$url" || continue
 
-    open_issues="$(gh issue list --repo "$WATCHDOG_REPO" --state open --json number,body)"
+    open_issues="$(gh_repo issue list --repo "$WATCHDOG_REPO" --state open --json number,body)"
     if [[ -z "$(jq -r --arg url "$url" '[.[] | select(.body | contains($url))][0].number // empty' <<<"$open_issues")" ]]; then
       echo "opening tracking issue for $url"
       open_tracking_issue "$url" "$title"
     fi
   done < <(jq -r '.[] | [.url, .title, .author.login] | @tsv' <<<"$candidates")
 
-  open_issues="$(gh issue list --repo "$WATCHDOG_REPO" --state open --json number,body)"
+  open_issues="$(gh_repo issue list --repo "$WATCHDOG_REPO" --state open --json number,body)"
   while IFS=$'\t' read -r issue_number issue_body; do
     [[ -z "$issue_number" ]] && continue
     local pr_url
