@@ -1,1 +1,6 @@
 node_modules/
+
+# Local Claude Code plugin install (opsx commands/skills) - already
+# available globally from ~/.config/claude/; a project copy would just
+# drift from the real plugin with no update path.
+.claude/
