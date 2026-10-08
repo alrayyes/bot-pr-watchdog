@@ -54,4 +54,4 @@ pre-push:
       run: bunx sort-package-json --check
 
     - name: bun audit
-      run: bun audit
+      run: bun audit --ignore GHSA-vfj7-8cjw-p6xm

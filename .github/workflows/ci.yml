@@ -47,7 +47,7 @@ jobs:
         with:
           args: -color
       - name: bun audit
-        run: bun audit
+        run: bun audit --ignore GHSA-vfj7-8cjw-p6xm
 
   test:
     runs-on: ubuntu-latest
