@@ -7,10 +7,6 @@ pre-commit:
       glob: "*.sh"
       run: shellcheck -x {staged_files}
 
-    - name: actionlint
-      glob: ".github/workflows/*.{yml,yaml}"
-      run: actionlint
-
     - name: prettier
       glob: "*.{md,yml,yaml}"
       run: bunx prettier --write {staged_files}
@@ -38,6 +34,8 @@ pre-push:
     - name: shellcheck
       run: shellcheck -x scripts/*.sh
 
+    # Reads the whole workflow set, so it can't take a staged list and
+    # doesn't belong in pre-commit.
     - name: actionlint
       run: actionlint
 
