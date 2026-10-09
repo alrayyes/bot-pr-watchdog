@@ -2,6 +2,12 @@
 
 setup() {
   WATCHDOG_SCRIPT="$BATS_TEST_DIRNAME/../scripts/watchdog.sh"
+  WATCHDOG_CMD=("$WATCHDOG_SCRIPT")
+  # CI sets KCOV_OUT to trace the script. kcov can't follow bats into a child
+  # process, so each test runs the script under its own kcov, merged later.
+  if [[ -n "${KCOV_OUT:-}" ]]; then
+    WATCHDOG_CMD=(kcov --include-pattern=watchdog.sh "$KCOV_OUT/test-$BATS_TEST_NUMBER" "$WATCHDOG_SCRIPT")
+  fi
   export WATCHDOG_OWNER=alrayyes
   export WATCHDOG_REPO=alrayyes/bot-pr-watchdog
   export WATCHDOG_ASSIGNEE=alrayyes
@@ -72,7 +78,7 @@ JSON
 JSON
   pr_view_fixture "alrayyes/foo" 5 OPEN FAILURE
 
-  run "$WATCHDOG_SCRIPT"
+  run "${WATCHDOG_CMD[@]}"
   [ "$status" -eq 0 ]
   grep -q "issue create" "$GH_LOG"
   grep -q "CI failing: fix(deps): bump x from 1 to 2" "$GH_LOG"
@@ -88,7 +94,7 @@ JSON
 JSON
   pr_view_fixture "alrayyes/foo" 5 OPEN FAILURE
 
-  run "$WATCHDOG_SCRIPT"
+  run "${WATCHDOG_CMD[@]}"
   [ "$status" -eq 0 ]
   grep -q "issue create" "$GH_LOG"
   [[ "$output" == *"::warning::could not assign issue #1 to alrayyes"* ]]
@@ -100,7 +106,7 @@ JSON
 JSON
   pr_view_fixture "alrayyes/foo" 9 OPEN FAILURE
 
-  run "$WATCHDOG_SCRIPT"
+  run "${WATCHDOG_CMD[@]}"
   [ "$status" -eq 0 ]
   grep -q "issue create" "$GH_LOG"
   grep -q "CI failing: chore(main): release 1.2.0" "$GH_LOG"
@@ -115,7 +121,7 @@ JSON
 JSON
   pr_view_fixture "alrayyes/foo" 5 OPEN FAILURE
 
-  run "$WATCHDOG_SCRIPT"
+  run "${WATCHDOG_CMD[@]}"
   [ "$status" -eq 0 ]
 
   run grep -q "issue create" "$GH_LOG"
@@ -128,7 +134,7 @@ JSON
 JSON
   pr_view_fixture "alrayyes/foo" 5 MERGED SUCCESS
 
-  run "$WATCHDOG_SCRIPT"
+  run "${WATCHDOG_CMD[@]}"
   [ "$status" -eq 0 ]
   grep -q "issue close 10 --repo alrayyes/bot-pr-watchdog" "$GH_LOG"
 }
@@ -139,7 +145,7 @@ JSON
 JSON
   pr_view_fixture "alrayyes/foo" 5 OPEN SUCCESS
 
-  run "$WATCHDOG_SCRIPT"
+  run "${WATCHDOG_CMD[@]}"
   [ "$status" -eq 0 ]
   grep -q "issue close 11 --repo alrayyes/bot-pr-watchdog" "$GH_LOG"
 }
@@ -150,7 +156,7 @@ JSON
 JSON
   pr_view_fixture "alrayyes/foo" 6 OPEN SUCCESS
 
-  run "$WATCHDOG_SCRIPT"
+  run "${WATCHDOG_CMD[@]}"
   [ "$status" -eq 0 ]
 
   run grep -q "issue create" "$GH_LOG"
@@ -164,7 +170,7 @@ JSON
   # No pr_view_fixture set up for alrayyes/foo#5, so the stub's "gh pr view"
   # fails exactly like a transient API error would.
 
-  run "$WATCHDOG_SCRIPT"
+  run "${WATCHDOG_CMD[@]}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"::warning::could not check https://github.com/alrayyes/foo/pull/5, leaving issue #13 open"* ]]
 
@@ -178,7 +184,7 @@ JSON
 JSON
   pr_view_fixture "alrayyes/foo" 7 OPEN FAILURE
 
-  run "$WATCHDOG_SCRIPT"
+  run "${WATCHDOG_CMD[@]}"
   [ "$status" -eq 0 ]
 
   run grep -q "issue create" "$GH_LOG"
