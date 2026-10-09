@@ -51,7 +51,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Not `apt-get install bats`: Ubuntu's packaged version is 1.2.1.
@@ -59,5 +59,87 @@ jobs:
         run: |
           git clone --quiet --depth 1 --branch v1.14.0 https://github.com/bats-core/bats-core.git /tmp/bats-core
           sudo /tmp/bats-core/install.sh /usr/local
+      # Built from a tag so the version is pinned: Ubuntu's mirror only keeps
+      # whichever kcov it currently ships.
+      - name: Install kcov
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends cmake binutils-dev libcurl4-openssl-dev libdw-dev libelf-dev libssl-dev zlib1g-dev libiberty-dev
+          git clone --quiet --depth 1 --branch v43 https://github.com/SimonKagstrom/kcov.git /tmp/kcov
+          cmake -S /tmp/kcov -B /tmp/kcov/build
+          cmake --build /tmp/kcov/build --parallel
+          sudo cmake --install /tmp/kcov/build
+      # KCOV_OUT makes the tests run the script under kcov, one run per test.
       - name: bats
-        run: bats tests/*.bats
+        env:
+          KCOV_OUT: ${{ github.workspace }}/out/kcov
+        run: |
+          mkdir -p out/kcov out/junit
+          bats --report-formatter junit --output out/junit tests/*.bats
+      - name: Merge the coverage runs
+        run: kcov --merge out/coverage out/kcov/test-*
+      - name: Assemble site/reports
+        env:
+          COMMIT: ${{ github.sha }}
+        run: |
+          mkdir -p site/reports/tests site/reports/coverage
+          cp out/junit/report.xml site/reports/tests/junit.xml
+          cp -R out/coverage/kcov-merged/. site/reports/coverage/
+          cp out/coverage/kcov-merged/cobertura.xml site/reports/coverage/coverage.xml
+          cat >site/reports/index.html <<HTML
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>bot-pr-watchdog reports</title>
+          </head>
+          <body>
+          <main>
+          <h1>bot-pr-watchdog reports</h1>
+          <p>Commit <code>${COMMIT}</code>, built $(date -u +%Y-%m-%d).</p>
+          <ul>
+          <li><a href="tests/junit.xml">Test results (JUnit XML)</a></li>
+          <li><a href="coverage/">Coverage (HTML)</a></li>
+          <li><a href="coverage/coverage.xml">Coverage (Cobertura XML)</a></li>
+          <li><a href="coverage/codecov.json">Coverage (kcov JSON)</a></li>
+          </ul>
+          </main>
+          </body>
+          </html>
+          HTML
+      - name: Upload the site
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+  # A Pages site is one deployment, and a deploy replaces all of it. Only a
+  # push to main publishes, and only behind a green lint and test run.
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      # The deploy succeeds whether or not the files are served, so fetch one.
+      # The retries cover the CDN catching up.
+      - name: Check the coverage report is served
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          curl --fail --silent --show-error --location \
+            --retry 6 --retry-delay 10 --retry-all-errors \
+            --output coverage.xml "${PAGE_URL%/}/reports/coverage/coverage.xml"
+          grep -q '<coverage ' coverage.xml

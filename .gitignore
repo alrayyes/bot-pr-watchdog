@@ -4,3 +4,5 @@ node_modules/
 # available globally from ~/.config/claude/; a project copy would just
 # drift from the real plugin with no update path.
 .claude/
+out/
+site/
