@@ -33,6 +33,7 @@ bunx lefthook install
 shellcheck -x scripts/*.sh
 actionlint
 bats tests/*.bats
+KCOV_OUT=$PWD/out/kcov bats tests/*.bats   # optional: trace the script with kcov (CI builds v43)
 bun run format:check   # prettier --check on *.md/*.yml/*.yaml
 bun run lint:md        # markdownlint-cli2
 bunx sort-package-json --check

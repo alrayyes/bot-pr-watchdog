@@ -62,6 +62,15 @@ this repo's own use:
 - `GH_REPO_TOKEN` (falls back to `GH_TOKEN`) — write access to this repo's
   issues (`GITHUB_TOKEN` in the workflow)
 
+## Reports
+
+Every push to `main` publishes the test and coverage reports:
+
+- [Test results](https://apis.ryankes.eu/bot-pr-watchdog/reports/tests/junit.xml) (JUnit XML)
+- [Coverage](https://apis.ryankes.eu/bot-pr-watchdog/reports/coverage/) (kcov HTML), and as
+  [Cobertura XML](https://apis.ryankes.eu/bot-pr-watchdog/reports/coverage/coverage.xml)
+- [Index](https://apis.ryankes.eu/bot-pr-watchdog/reports/) with the commit and date
+
 ## Reducing bot-PR noise further
 
 This repo only covers the _failure_ half of bot-PR noise — it says nothing
