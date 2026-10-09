@@ -191,3 +191,17 @@ JSON
   [ "$status" -ne 0 ]
 }
 
+
+@test "skips an open issue that links no PR instead of exiting" {
+  cat >"$GH_ISSUE_LIST_JSON" <<'JSON'
+[{"number":14,"body":"A hand-written issue with no pull request link."},{"number":15,"body":"https://github.com/alrayyes/foo/pull/5 has a failing check."}]
+JSON
+  pr_view_fixture "alrayyes/foo" 5 MERGED SUCCESS
+
+  run "${WATCHDOG_CMD[@]}"
+  [ "$status" -eq 0 ]
+  # The issue after the unlinked one is still reconciled.
+  grep -q "issue close 15 --repo alrayyes/bot-pr-watchdog" "$GH_LOG"
+  run grep -q "issue close 14" "$GH_LOG"
+  [ "$status" -ne 0 ]
+}

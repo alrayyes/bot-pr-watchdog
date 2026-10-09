@@ -72,9 +72,12 @@ close_tracking_issue() {
     --comment "Closing automatically: $reason."
 }
 
-# Extracts the one github.com PR URL a tracking issue's body links to.
+# Extracts the one github.com PR URL a tracking issue's body links to. Prints
+# nothing, and still succeeds, for an issue that links none: grep's no-match
+# exit would otherwise kill the script under set -e/pipefail on the first
+# hand-written issue in the repo.
 tracked_pr_url() {
-  grep -oE 'https://github\.com/[^/[:space:]]+/[^/[:space:]]+/pull/[0-9]+' <<<"$1" | head -1
+  { grep -oE 'https://github\.com/[^/[:space:]]+/[^/[:space:]]+/pull/[0-9]+' <<<"$1" || true; } | head -1
 }
 
 main() {
