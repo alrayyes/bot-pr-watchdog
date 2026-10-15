@@ -42,7 +42,11 @@ bun audit
 
 Everything above also runs in CI (`.github/workflows/ci.yml`); `lefthook`
 runs the same commands as pre-commit/pre-push hooks so nothing here can
-drift from what the pipeline checks.
+drift from what the pipeline checks. The one difference is `bun audit`: CI's
+`audit` job fails a pull request only for advisories it adds to `bun.lock`,
+while the local command lists everything. What is already on `main` is tracked
+by `advisory-scan.yml`, which keeps one open `Dependency advisories` issue and
+closes it when the audit is clean. Nothing is ignored.
 
 ## Commit messages
 
