@@ -37,16 +37,19 @@ KCOV_OUT=$PWD/out/kcov bats tests/*.bats   # optional: trace the script with kco
 bun run format:check   # prettier --check on *.md/*.yml/*.yaml
 bun run lint:md        # markdownlint-cli2
 bunx sort-package-json --check
-bun audit
 ```
 
 Everything above also runs in CI (`.github/workflows/ci.yml`); `lefthook`
 runs the same commands as pre-commit/pre-push hooks so nothing here can
-drift from what the pipeline checks. The one difference is `bun audit`: CI's
-`audit` job fails a pull request only for advisories it adds to `bun.lock`,
-while the local command lists everything. What is already on `main` is tracked
-by `advisory-scan.yml`, which keeps one open `Dependency advisories` issue and
-closes it when the audit is clean. Nothing is ignored.
+drift from what the pipeline checks.
+
+CI's `audit` job fails a pull request only for advisories it adds to `bun.lock`.
+What is already on `main` is tracked by `advisory-scan.yml`, which keeps one open
+`Dependency advisories` issue and closes it when the audit is clean. Nothing is
+ignored.
+
+No hook runs the audit: it can't compare base and head, so it would fail on
+advisories already on `main`. To run it by hand, use `bun audit`.
 
 ## Commit messages
 
