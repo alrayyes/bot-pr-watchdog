@@ -65,10 +65,13 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           deps=true
-          if [ "${EVENT}" = pull_request ] &&
-            ! git diff --name-only "${BASE}...HEAD" |
-              grep -Eq '^(package\.json|bun\.lock|\.github/workflows/ci\.yml)$'; then
-            deps=false
+          if [ "${EVENT}" = pull_request ]; then
+            # Captured first so a failed diff (missing base SHA) stops the step under `bash -e`
+            # instead of reading as "nothing changed".
+            files=$(git diff --name-only "${BASE}...HEAD")
+            if ! grep -Eq '^(package\.json|bun\.lock|\.github/workflows/ci\.yml)$' <<<"${files}"; then
+              deps=false
+            fi
           fi
           echo "deps=${deps}" >> "$GITHUB_OUTPUT"
 
@@ -77,7 +80,8 @@ jobs:
   # lockfile, so neither side needs an install.
   audit:
     needs: changes
-    if: needs.changes.outputs.deps == 'true'
+    # Runs when the changes job failed too: a gate that can't tell what changed must not skip.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.deps == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
