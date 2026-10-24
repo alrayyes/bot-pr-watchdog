@@ -1,0 +1,26 @@
+# Dependabot has no built-in `automerge: true` the way Renovate does. This
+# arms auto-merge for every Dependabot pull request, major included, and lets
+# GitHub wait for the required checks on `main` before it merges.
+#
+# pull_request, not pull_request_target: Dependabot's pull requests come from
+# a branch on this repo, never a fork, so there's no untrusted checkout to
+# guard against, and GITHUB_TOKEN gets write access for dependabot[bot].
+name: dependabot-auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Enable auto-merge
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
